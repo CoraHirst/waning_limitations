@@ -5,4 +5,5 @@ format: html
 
 # Introduction 
 
-The purpose of this document is to generate a time series of antibody titer decay according to a power law post primary immune response. The magnitude of the response and power law decay coefficient will be the same for all subsequent simulated secondary infections; the newly generated titers of the secondary response will boost and decay with a magnitude proportional to the magnitude of the primary response and the power law decay coefficient 
+The purpose of this document is to generate a time series of antibody titer decay according to a power law post primary immune response. The magnitude of the response and power law decay coefficient will be the same for all subsequent simulated secondary infections; the newly generated titers of the secondary response will boost and decay with a magnitude proportional to the magnitude of the primary response and the power law decay coefficient.
+
