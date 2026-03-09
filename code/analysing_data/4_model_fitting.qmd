@@ -3,3 +3,132 @@ title: "4_model_fitting"
 format: html
 ---
 
+```{r setup}
+# loading libraries
+library(here) #for referencing relative to .rproject repo
+library(ggplot2) #for plotting
+library(tidyverse) #for easy manipulating dataframes
+library(lme4) 
+library(gridExtra)
+
+# code from source
+source(here("code", "functions", "functions.R"))
+```
+
+# Objective
+
+The goal of this document is to fit a power law decay model to time series of observed antibody titers after secondary responses. We note that these observed titers will be the sum of two power laws: the power-law decaying titers of the primary response, and the power-law decaying titers of the secodnary response. The sum of these two are not a power law, and we would like to understand the extent of error we might expect when we don't take into account prior response history into our fitting of power law models to secondary responses. 
+
+We hypothesize that the time between the primary and secondary response (which we refer to as $\tau$), as well as the extent of the fold change upon secondary response (which we refer to as $\delta$), will both affect the fit of a power law to the observed titers after a secondary response. We have already generated time series of secondary response titers given combinations of $\tau$ and $\delta$.
+
+These are the time series for which we will will fit a power law after secondary response.
+
+# Loading parameters and data 
+
+We have already generated time series of secondary response titers given combinations of $\tau$ and $\delta$. 
+
+Below, we load the parameters for the primary power law, the combinations of $\tau$ and $\delta$ used to generate secodnary responses, and the time series of primary and secondary responses.
+
+```{r load-parameters-and-data}
+# power law parms
+power.law.parms = read.csv(here("data", "parameters", "power_law_parms.csv"))
+
+# secondary responses parms
+tau.and.delta = read.csv(here("data", "parameters", "tau_and_delta.csv"))
+
+# time series
+time.series = read.csv(here("data", "secondary response", "secondary_responses.csv"))
+
+```
+
+Below, we group filter the time series such that only titers after the secondary response remain.
+
+```{r filter-data-for-secondary-response}
+# filtering for response == 2
+time.series = time.series %>% filter(response == 2)
+
+```
+
+# fitting power law model to observed titers after secondary response 
+
+Below, we fit a power law model to time series of observed titers after secondary responses for each unique combination of $\tau$ and $\delta$. 
+
+Because a power-law describes a linear relationship between $log(Time)$ and $log(Titer)$, we can fit a linear model to $log10(Observed \ Titer)$ and $log10(Time)$.
+
+```{r fitting-power-laws}
+# extracting taus and deltas
+taus = unique(tau.and.delta$tau)
+deltas = unique(tau.and.delta$delta)
+
+# calculating AICs 
+AICs = sapply(deltas, function(combo.delta){ #cols
+  sapply(taus, function(combo.tau){ #rows
+    
+    #filter time series for unique tau and delta combination
+    time.series = time.series %>% 
+      dplyr::filter(tau == combo.tau, 
+             delta == combo.delta) 
+    
+    #fit lm model to log-log vars
+    model = lm(data = time.series, log(observed) ~ log(time-combo.tau)) #log-log linear
+    
+    # extract model AIC
+    AIC = AIC(model)
+  })
+})
+
+# calculating k 
+estimated.ks = sapply(deltas, function(combo.delta){ #deltas are columns
+  sapply(taus, function(combo.tau){ #taus are rows
+   #filter time series for unique tau and delta combination
+    time.series = time.series %>%
+      filter(tau == combo.tau, 
+             delta == combo.delta) 
+    
+    #fit lm model to log-log vars
+    model = lm(data = time.series, log(observed) ~ log(time-combo.tau))
+    
+    # extract model AIC
+    estimated.k = coef(model)[2]
+  })
+})
+
+```
+
+Finally, we might like to calculate the fractional error in the estimated $k$. We know that secondary titers decay with the same rate as the primary titers, $k$, and that the addition of tiers from the primary response may reduce the estimated decay constant. 
+
+```{r fractional-error-k}
+# fractional error function from functions.R
+error.k = apply(estimated.ks, MARGIN = c(1,2), FUN = function(estimated.k){ #margins 1,2 means element-wise 
+  frac.error = fractional_error(k.true = power.law.parms$k[1], k.estimated = estimated.k) #calculates fractional error for each element in estimated.ks
+})
+
+```
+
+# Saving analyses to results
+
+We save these 3 data frames - AIC, estimated $k$, and fractional error in $k$, as .csv files in `results/tables/analysis`
+
+```{r saving}
+# adding row to indicate tau and columns to indicate delta
+AICs = cbind(taus, AICs) %>% as.data.frame()
+colnames(AICs) = c("tau", deltas) 
+
+estimated.ks = cbind(taus, estimated.ks) %>% as.data.frame()
+colnames(estimated.ks) = c("tau", deltas) 
+
+error.k = cbind(taus, error.k) %>% as.data.frame()
+colnames(error.k) = c("tau", deltas) 
+
+#save as csv files
+file = here("results", "tables", "analysis", "AICs.csv")
+write.csv(AICs, file = file, row.names = F)
+
+file = here("results", "tables", "analysis", "estimated_ks.csv")
+write.csv(estimated.ks, file = file, row.names = F)
+
+file = here("results", "tables", "analysis", "error_k.csv")
+write.csv(error.k, file = file, row.names = F)
+```
+
+
