@@ -17,4 +17,4 @@ additive_power_law_function = function(A1, k, delta, tau, time){  #tau is the ti
 ###############################
 
 # fractional error function 
-fractional_error = function(k.true, k.estimated) {(k.estimated-k.true)/k.true}
+fractional_error = function(k.true, k.estimated) {abs((k.estimated-k.true)/k.true)}

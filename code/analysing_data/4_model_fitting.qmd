@@ -1,5 +1,6 @@
 ---
-title: "4_model_fitting"
+title: "Model fitting to secondary response titers"
+subtitle: "Analysing error in fitting power law decay to observed titers post secondary response"
 format: html
 ---
 

@@ -59,18 +59,29 @@ below, we plot these as contour plots:
 
 ```{r contour-plots}
 #plot AICs
-plot1 = filled.contour(x = taus, y = deltas, z=AICs, lwd = 2, xlab = expression(tau), ylab = expression(delta), main = "AIC of Power Law Fit to Observed Secondary Response Titers")
+filled.contour(x = taus, y = deltas, z=AICs, lwd = 2, xlab = expression(tau), ylab = expression(delta), main = "AIC of Power Law Fit to Observed Secondary Response Titers")
 
 #plot estimated ks
-plot2 = filled.contour(x = taus, y = deltas, z=estimated.ks, lwd = 2, xlab = expression(tau), ylab = expression(delta), main = "Estimated k of Power Law \n fit to Observed Secondary Response Titers")
+filled.contour(x = taus, y = deltas, z=estimated.ks, lwd = 2, xlab = expression(tau), ylab = expression(delta), main = "Estimated k of Power Law \n Fit to Observed Secondary Response Titers")
 
 #plot estimated ks
-plot3 = filled.contour(x = taus, y = deltas, z=error.k, lwd = 2, xlab = expression(tau), ylab = expression(delta), main = "Fractional Error of k of Power Law \n fit to Observed Secondary Response Titers")
+filled.contour(x = taus, y = deltas, z=error.k, lwd = 2, xlab = expression(tau), ylab = expression(delta), main = "Fractional Error of k of Power Law \n Fit to Observed Secondary Response Titers")
 
-#print to viewer
-print(plot1)
-print(plot2)
-print(plot3)
+########### save figures ##################
+file = here("results", "figures", "fit limitations", "AICs.png") #name file path
+png(file) #open developer
+  filled.contour(x = taus, y = deltas, z=AICs, lwd = 2, xlab = expression(tau), ylab = expression(delta), main = "AIC of Power Law Fit to Observed Secondary Response Titers") #draw figure
+dev.off() #close developer
+
+file = here("results", "figures", "fit limitations", "estimated_ks.png")
+png(file)
+ filled.contour(x = taus, y = deltas, z=estimated.ks, lwd = 2, xlab = expression(tau), ylab = expression(delta), main = "Estimated k of Power Law \n Fit to Observed Secondary Response Titers")
+dev.off()
+
+file = here("results", "figures", "fit limitations", "error_k.png")
+png(file)
+  filled.contour(x = taus, y = deltas, z=error.k, lwd = 2, xlab = expression(tau), ylab = expression(delta), main = "Fractional Error of k of Power Law \n Fit to Observed Secondary Response Titers")
+dev.off()
 ```
 
 
