@@ -1,0 +1,129 @@
+---
+title: "Secondary Responses"
+subtitle: "Generating a time series of power-law decaying antibody titers after secondary vaccination or infection"
+format: html
+---
+
+```{r setup}
+# loading libraries
+library(here) #for referencing relative to .rproject repo
+library(ggplot2) #for plotting
+library(dplyr) #for easy manipulating dataframes
+library(lme4) 
+
+# code from source
+source(here("Theory", "code", "functions", "functions.R"))
+```
+
+# Objective
+
+The goal of this document is to generate a time series of antibody titer decay according to a power law post secondary response. 
+
+We will generate time series of secondary responses varying the time between primary and secondary response ($\tau$) and the fold change at the time of secondary response ($\delta$).
+
+# Equations
+
+Antibody titers generated after a primary response decay according to a power law that begins at $Time_0$ and peaks at $Time=1$ with titer $Ab_1$: 
+
+$$
+Ab(Time) = AB_1(Time)^k
+$$
+
+The time between primary and secondary response is $\tau$. The fold change in titers at the peak of the secondary response ($time = \tau + 1$) is $\delta$. This fold change is the sum of the titer remaining from the primary response ($Ab_1(\tau+1)^k$) and the newly generated titer.
+
+The newly generated titers decay according to the power law $Ab(Time) = (\delta Ab_1(\tau)^k - Ab_1(\tau+1)^k)(Time - \tau)^k$. 
+
+The overall observed anitbody titer will be the sum of these two populations: 
+
+$$
+Ab(Time) = Ab_1(\tau+1)^k + (\delta Ab_1(\tau)^k - Ab_1(\tau+1)^k)(Time - \tau)^k
+$$
+Ultimately, we would like to know how $\delta$ and $\tau$ effect the fit of a power law model to this non-power law sum, both in terms of AIC and in terms of the error in the estimate of the true decay parameter, $k$.
+
+In this document, we will vary $\delta$ and $\tau$ to generate time series of a secondary response. We will save these time series to a data frame for model fitting. 
+
+# Generating secondary responses
+
+In generating our time series of primary and secondary antibody repsonses, we would like to track: 
+
+1) Titers remaining from primary response (follows a true power law);
+2) Titers that are newly generated (follows a true power law); and
+3) The observed sum of these two titers (does not follow a true power law)
+
+## Setting parameters 
+
+First, we generate a set of combinations of $\tau$ and $\delta$. 
+
+```{r generate-parms-df}
+# set taus in terms of months - leaving at least 3 years for second boost time series
+taus = seq(1,17)*12 # time in months, so seq is in years and multiply by 12 for months
+# set deltas
+deltas = seq(2,10, by = 0.5)
+
+# generate combination matrix and set column names
+parameters = expand.grid("tau" = taus, "delta" = deltas, KEEP.OUT.ATTRS = F) # should have length(deltas) x length(taus) rows; keep out attributes = F stops the return of metadata
+
+# save parameters df 
+file = here("Theory", "data", "parameters", "tau_and_delta.csv")
+write.csv(parameters, file = file, row.names = F)
+```
+
+Next, we load our parameters for the power law decay after primary response.
+
+```{r load-power-law-parms}
+# load saved parms from csv
+power.law.parms = read.csv(here("Theory", "data", "parameters", "power_law_parms.csv"))
+
+# save individually to environment
+A1 = power.law.parms[1, "A1"] #peak of primary response
+k = power.law.parms[1, "k"] #power law decay constant
+Tmax = power.law.parms[1, "Tmax"] #maximum time for both responses
+```
+
+## Generating time series
+
+We will iterate over all rows of the $\tau$ and $\delta$ combinations dataframe generated in the code chunk above to simulate a secondary response. For each secondary response, we will save both the titers from response 1 and response 2, as well as the sum of both, from $T_0$ of the primary response to $Tmax$, in a dataframe. 
+
+```{r generate-secondary-responses}
+# iterate over parameter df for every combination of tau and delta upon secondary response
+time.series = lapply(t(parameters) %>% as.data.frame(), function(parms){ #transpose because lapply takes rowwise
+  ## set times for second response , tau, and delta
+  tau =  parms[1] #from parms df
+  delta = parms[2] #from parms df
+  times = seq(tau+1, Tmax, by = 0.5)
+  
+  ## generate antibody titers from primary and secondary responses at time tau + 1 to Tmax
+  primary.response = power_law_function(A1 = A1, k = k, time = times) #remaining primary response
+  secondary.response = additive_power_law_function(A1 = A1, k = k, tau = tau, delta = delta, time = times) # new secondary response 
+  observed = primary.response + secondary.response #observed titer is the sum of both
+  
+  ## format dataframe of both populations and observed, add time and label with tau and delta
+  boost = data.frame("response" = 2, "tau" = tau, "delta" = delta, "time" = times, "response.1.titer" = primary.response, "response.2.titer" = secondary.response, "observed" = observed)
+  
+  ## add titers from time 0 to time tau
+  primary.pre.tau = read.csv(here("Theory", "data", "primary response", "primary_response.csv")) #load primary titers
+  primary.pre.tau = primary.pre.tau %>%
+    filter(time <= tau) %>%
+    mutate("response.2.titer" = 0,
+           "observed" = response.1.titer + response.2.titer,
+           "tau" = tau,
+           "delta" = delta)
+  
+  ## bind pre tau and post tau titer dfs
+  time.series = rbind(primary.pre.tau, boost) %>% as.data.frame()
+  
+  return(time.series)
+})
+
+## concatenated all dfs into a list to easily save
+time.series = do.call(rbind, time.series) %>% as.data.frame()
+
+## save to data
+file = here("Theory", "data", "secondary response", "secondary_responses.csv")
+write.csv(time.series, file = file, row.names = F)
+```
+
+Now, we have a dataframe of time series of primary and secondar responses from each combination of $\tau$ and $\delta$.
+
+We will visualize a few of these in the file `code\generating_data\3_response_figures.qmd`. 
+We will fit the observed titers after the secondary response to a power law in `code\analysing_data\4_model_fitting.qmd`.

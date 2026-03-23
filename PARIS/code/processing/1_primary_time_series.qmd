@@ -1,0 +1,114 @@
+---
+title: "1_primary_time_series"
+format: html
+---
+
+```{r setup}
+#load libraries
+library(here)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(RColorBrewer)
+library(khroma)
+
+#load data processing functions
+source(here("PARIS", "code", "functions", "processing_functions.R"))
+
+#set colors
+# colors for plotting
+num_cols = 120
+my.colors = color("batlow")(num_cols)
+
+```
+
+# Objective
+
+The goal of this document is to filter the PARIS Cohort time series of antibody titers after primary (2-dose) vaccine series. We will filter such that: 
+
+1) Only time series after primary vaccination for participants who had both the primary series (primary vaccination) and a third booster dose (secondary vaccination), and are included, 
+2) Only time series after primary vaccination from participants who had no prior infection before primary vaccination *and* no breakthough infection between primary and secondary vaccination are included, and 
+3) only titers taken after 1 month post first dose are included. 
+
+These time series will be saved in `Paris\data\primary`. 
+
+The time series will be plotted with the secondary vaccination titers in `Paris\code\figures\time_series.qmd` and saved to `Paris\results\figures\time_series.png`.
+
+# Loading data
+
+We will be using the data previously analyzed in Srivistava et al, Immunity, 2024 (see `assets/srivastava_immunity_2024`.
+
+We were generously gifted an excel file which contains information about: 
+
+1) antibody titers (by ELISA AUC) following primary, secondary, and tertiary vaccination for various participants, each contained in a different sheet(`F2. Panel A1`, `F2. Panel B1`, `F2. Panel C1`);
+2) the IDs of participants for which there are no breakthrough infections between primary and secondary vaccination (`primary-boost-no-infection`);
+3) whether participants had previous SARS-CoV-2 infection at the time of primary vaccination (`F2. Panel A1`)
+
+In the code chunk below, we load each sheet from the excel file as a data frame, and store the collection in a list:
+
+```{r load-data}
+# read excel file
+PARIS.data = multiplesheets(here("PARIS", "data", "PARIS", "PARIS_cohort_3dose.xlsx"))
+
+```
+
+We will be filtering the data frame `F2. Panel A1`, which contains 4 columns detailing each serum antibody titer (observation): 
+
+1) `Days from First Vaccine`, containing a numberic describing the time (in days) elapsed between the first dose of the two-dose vaccine series at which the serum sample was collected; 
+2) `AUC`, containing a numeric describing the area under the ELISA dilution assay curve for serum sample collected at each time point; 
+3) `Infection Pre-Vaccination`, containing a binary describing whether the serum sample was collected from a participant who had been infected before their first vaccine dose; and
+4) `Participant ID`, containing a string labelling the participant from from whom the serum sample was collected. 
+
+First, we will be saving this dataframe as it's own variable and filtering based on the `Infection Pre-Vaccination` variable such that only individuals who were **not** previously infected will remain. 
+```{r filter-out-prior-infections}
+# save df locally
+PARIS.first.dose = PARIS.data$`F2. Panel A1` 
+
+# Filter for not previously infected and format df
+PARIS.first.dose = PARIS.first.dose %>%
+  filter(`Infection Pre-Vaccine?` == "no") %>% # include only people without prior immunity before first dose
+  mutate("Days_post" = `Days from First Vaccine Dose`, # rename columns for easier referencing
+         "Titer" = `AUC`,
+         "ID" = `Participant ID`) %>%
+  select(!c(`Days from First Vaccine Dose`, `AUC`, `Participant ID`, `Infection Pre-Vaccine?`)) # remove infection pre-vacc column because not needed
+
+```
+
+Below, we save only time series labelled with the participant IDs of all individuals who **did not** have a breakthrough infection between the first and second dose. These IDs are contained in the dataframe `Primary-boost-no-infection`. We will save this as a vector `Relevant.IDs` locally and filter `Paris.first.dose` such that only the IDs contained within `Relevant.IDs` remain.
+
+```{r filter-out-breakthrough-infections}
+# save participant IDs
+Relevant.IDs = PARIS.data$`Primary-boost-no-infection` %>% unlist() %>% unname() # save as a vector 
+
+# Filter only IDs with no breakthrough infection between primary and secondary vaccine
+PARIS.first.dose = PARIS.first.dose %>%
+  filter(ID %in% Relevant.IDs) 
+
+# visualize
+ggplot() + 
+  geom_point(data = PARIS.first.dose, aes(x=Days_post, y = log10(Titer), group = ID, col = ID)) + 
+  theme_bw() + 
+  theme(legend.position = "none") +
+  scale_color_manual(values = my.colors)
+```
+
+Finally, we will filter our data frame such that only titers from serum collected 1 month post vaccination remain. We will add a new column, "time", that denotes the time normalized to the interval between the vaccination and the approximate peek of the response at day 30, so that $time = days_post/30$. We normalize time to this interval between the vaccine and the peak because it allows us to estimate the peak titer as a parameter in the power law (titer at time = 1) and to understand the time scale on which log waning of antibodies is linear with log time (power law). 
+
+```{r filter-days-post}
+#filter df based on days post
+PARIS.first.dose = PARIS.first.dose %>%
+  filter(Days_post >= 30) %>% #we set t1 to 30 days post vaccine, so that time will be days_post/30
+  mutate(Time = Days_post/30) #normalize time as new column
+
+#plot log-log scale.
+ggplot() + 
+  geom_point(data = PARIS.first.dose, aes(x=log10(Time), y = log10(Titer), group = ID, col = ID)) + 
+  theme_bw() + 
+  theme(legend.position = "none") +
+  scale_color_manual(values = my.colors)
+
+```
+
+Starting on the downhill: in the next document, I will fit a linear mixed-effects model to these titers to determine the overall power-law that best fits the data and the individual powe rlaws that describes the power-law decay of antibody titers by each participant ID. 
+
+With these modes, I can predict the continued decay of post-vaccine-1 titers after the next response and determine how much the observed attenuation of waning after a booster seems to wane more slowly because of the dynamics of titers remaining from the first response. 

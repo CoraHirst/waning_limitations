@@ -1,0 +1,25 @@
+---
+title: "6_fitting_to_exponential"
+format: html
+---
+
+# Objective
+
+We would like to see how the difference in fit of secondary responses to a power law vs an exponential decay function changes as a function of $\tau$ and $\delta$. 
+ 
+Because we would like to understand whether the addition of prior responses can explain the "unreasonably" good fit of a power law vs an exponential function to antibody titer decay, we will perform this fitting in the same way as we preformed fitting to antibody titer time series a la mark slifka. 
+
+We disregard the first three years after the boost and then fit. 
+
+As such, we will only fit the secondary response for which there is at least 48 months of data after boost ($time - \tau > 36$), and we will disregard the first 36 months.
+
+# Load data
+
+We load our generated secondary responses below: 
+
+```{r load-time-series}
+# load time series
+time.series = read.csv(here("Theory", "data", "secondary response", "secodnary_responses.csv"))
+
+# 
+```
