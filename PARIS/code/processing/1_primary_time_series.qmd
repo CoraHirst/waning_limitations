@@ -52,6 +52,8 @@ PARIS.data = multiplesheets(here("PARIS", "data", "PARIS", "PARIS_cohort_3dose.x
 
 ```
 
+# Filtering data for primary responses fillowed by secondary responses
+
 We will be filtering the data frame `F2. Panel A1`, which contains 4 columns detailing each serum antibody titer (observation): 
 
 1) `Days from First Vaccine`, containing a numberic describing the time (in days) elapsed between the first dose of the two-dose vaccine series at which the serum sample was collected; 
@@ -60,12 +62,13 @@ We will be filtering the data frame `F2. Panel A1`, which contains 4 columns det
 4) `Participant ID`, containing a string labelling the participant from from whom the serum sample was collected. 
 
 First, we will be saving this dataframe as it's own variable and filtering based on the `Infection Pre-Vaccination` variable such that only individuals who were **not** previously infected will remain. 
+
 ```{r filter-out-prior-infections}
 # save df locally
-PARIS.first.dose = PARIS.data$`F2. Panel A1` 
+PARIS.first.vacc = PARIS.data$`F2. Panel A1` 
 
 # Filter for not previously infected and format df
-PARIS.first.dose = PARIS.first.dose %>%
+PARIS.first.vacc = PARIS.first.vacc %>%
   filter(`Infection Pre-Vaccine?` == "no") %>% # include only people without prior immunity before first dose
   mutate("Days_post" = `Days from First Vaccine Dose`, # rename columns for easier referencing
          "Titer" = `AUC`,
@@ -74,41 +77,91 @@ PARIS.first.dose = PARIS.first.dose %>%
 
 ```
 
-Below, we save only time series labelled with the participant IDs of all individuals who **did not** have a breakthrough infection between the first and second dose. These IDs are contained in the dataframe `Primary-boost-no-infection`. We will save this as a vector `Relevant.IDs` locally and filter `Paris.first.dose` such that only the IDs contained within `Relevant.IDs` remain.
+Below, we save only time series labelled with the participant IDs of all individuals who **did not** have a breakthrough infection between the first and second dose. These IDs are contained in the dataframe `Primary-boost-no-infection`. We will save this as a vector `Relevant.IDs` locally and filter `PARIS.first.vacc` such that only the IDs contained within `Relevant.IDs` remain.
 
 ```{r filter-out-breakthrough-infections}
 # save participant IDs
 Relevant.IDs = PARIS.data$`Primary-boost-no-infection` %>% unlist() %>% unname() # save as a vector 
 
 # Filter only IDs with no breakthrough infection between primary and secondary vaccine
-PARIS.first.dose = PARIS.first.dose %>%
+PARIS.first.vacc = PARIS.first.vacc %>%
   filter(ID %in% Relevant.IDs) 
 
 # visualize
 ggplot() + 
-  geom_point(data = PARIS.first.dose, aes(x=Days_post, y = log10(Titer), group = ID, col = ID)) + 
+  geom_point(data = PARIS.first.vacc, aes(x=Days_post, y = log10(Titer), group = ID, col = ID)) + 
   theme_bw() + 
   theme(legend.position = "none") +
   scale_color_manual(values = my.colors)
 ```
 
-Finally, we will filter our data frame such that only titers from serum collected 1 month post vaccination remain. We will add a new column, "time", that denotes the time normalized to the interval between the vaccination and the approximate peek of the response at day 30, so that $time = days_post/30$. We normalize time to this interval between the vaccine and the peak because it allows us to estimate the peak titer as a parameter in the power law (titer at time = 1) and to understand the time scale on which log waning of antibodies is linear with log time (power law). 
+
+# Filtering data for power law analysis
+
+We will filter our data frame such that only titers from serum collected 1 month post vaccination remain. We will add a new column, "time", that denotes the time normalized to the interval between the vaccination and the approximate peek of the response at day 32, so that $time = days_post/32$. We normalize time to this interval between the vaccine and the peak because it allows us to estimate the peak titer as a parameter in the power law (titer at time = 1) and to understand the time scale on which log waning of antibodies is linear with log time (power law). 
 
 ```{r filter-days-post}
+# time of peak: days post 
+peak.day = 32
+
 #filter df based on days post
-PARIS.first.dose = PARIS.first.dose %>%
-  filter(Days_post >= 30) %>% #we set t1 to 30 days post vaccine, so that time will be days_post/30
-  mutate(Time = Days_post/30) #normalize time as new column
+PARIS.first.vacc = PARIS.first.vacc %>%
+  filter(Days_post >= peak.day) %>% #we set t1 to ~30 days post vaccine, so that time will be days_post/30
+  mutate(Time = Days_post/peak.day) #normalize time as new column
 
 #plot log-log scale.
 ggplot() + 
-  geom_point(data = PARIS.first.dose, aes(x=log10(Time), y = log10(Titer), group = ID, col = ID)) + 
+  geom_point(data = PARIS.first.vacc, aes(x=log10(Time), y = log10(Titer), group = ID, col = ID), alpha = 0.7) + 
+  geom_line(data = PARIS.first.vacc, aes(x=log10(Time), y = log10(Titer), group = ID, col = ID)) +
   theme_bw() + 
   theme(legend.position = "none") +
   scale_color_manual(values = my.colors)
 
 ```
 
-Starting on the downhill: in the next document, I will fit a linear mixed-effects model to these titers to determine the overall power-law that best fits the data and the individual powe rlaws that describes the power-law decay of antibody titers by each participant ID. 
+We will filter the data according to two more conditions: 
+
+1) time series that continue to increase post day 32 (have not yet reached their peak) will be truncated such that only titers on the waning phase are included, and
+2) time series for which there are subsequent boosts will be removed. 
+
+```{r filter-waning-only}
+#LOOKING FOR POSSIBLE INTERNAL BOOSTERS
+ggplot() + geom_line(data = PARIS.first.vacc, aes(x =Time, y = Titer, group = ID, col = ID)) +
+  facet_wrap(~ID) + #plots each time series on a separate plot
+  scale_color_manual(values = my.colors) +
+  theme(legend.position = "none")
+
+#isolating IDs of internal boosters
+internal.boosters = PARIS.first.vacc %>%
+  group_by(ID) %>%
+  arrange(Time, by.group = T) %>%
+  filter(Titer/lag(Titer) >= 3) %>% #identifies time series with an internal boost > some fc threshold for concern
+  pull(ID) #extract a vector of the unique IDs for which this condition is true
+  
+# plot to see
+ggplot() + geom_line(data = PARIS.first.vacc %>% filter(ID %in% internal.boosters), aes(x =Time, y = Titer, group = ID, col = ID)) +
+  facet_wrap(~ID) + #plots each time series on a separate plot
+  scale_color_manual(values = my.colors) +
+  theme(legend.position = "none")
+  
+
+```
+
+For now, I will leave these individuals in the dataset, as most "boosts" occur at low titers where they may simply be the result of noisy ELISA reports (IDs `PARIS-001`, `PARIS-076`, `PARIS-120`), or at the beginning of waning, where we have only just failed to catch the peak of the response (IDs `PARIS-184`, `PARIS-044`).
+
+# Saving processed data
+
+We save these time series to `PARIS\data\primary\processed_primary.csv`.
+
+```{r save-processed-data}
+#write to csv file
+file = here("PARIS", "data", "primary", "processed_primary.csv")
+write.csv(PARIS.first.vacc, file = file) 
+
+```
+
+# Starting on the downhill 
+
+In the next document, I will fit a linear mixed-effects model to a log-log transformation of these titers to determine the overall power-law that best fits the data and the individual power laws that describes the power-law decay of antibody titers by each participant ID. 
 
 With these modes, I can predict the continued decay of post-vaccine-1 titers after the next response and determine how much the observed attenuation of waning after a booster seems to wane more slowly because of the dynamics of titers remaining from the first response. 

@@ -1,0 +1,37 @@
+---
+title: "1_primary_power_fits"
+format: html
+---
+
+```{r setup}
+#load libraries
+library(here)
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+library(RColorBrewer)
+library(khroma)
+
+#load data processing functions
+source(here("PARIS", "code", "functions", "analysis_functions.R"))
+
+#set colors
+# colors for plotting
+num_cols = 120
+my.colors = color("batlow")(num_cols)
+
+```
+
+# Objective
+
+The purpose of this document is to fit a power law to time series of antibody titers after primary vaccination series to SARS-CoV-2. 
+
+We would like to save:
+1) the best fit powerlaw describing the ensemble of time series, and
+2) the best-fit powerlaw describing each individual series. 
+
+Moving forward, we will use the individual fits to predict the titers remaining from primary vaccination for each individual, and adjust the observed titers after secondary vaccination by this amount. With this information, we can determine whether the apparent decrease in decay rate on secondary vaccination is an artifact of slowly decaying primary titers, or if it warrants additional biological explanation. 
+
+# Loading time series
+
+We previously processed our time series after primary vaccination and saved these to
