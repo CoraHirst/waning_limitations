@@ -34,4 +34,11 @@ Moving forward, we will use the individual fits to predict the titers remaining 
 
 # Loading time series
 
-We previously processed our time series after primary vaccination and saved these to
+We previously processed our time series after primary vaccination and saved these to `PARIS\data\primary\processed_primary.csv`. We load these below: 
+
+```{r load-data}
+# read csv 
+primary.series = read.csv(file = here("PARIS", "data", "primary", "processed_primary.csv"))
+
+
+```
