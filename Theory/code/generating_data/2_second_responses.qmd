@@ -58,7 +58,7 @@ First, we generate a set of combinations of $\tau$ and $\delta$.
 # set taus in terms of months - leaving at least 3 years for second boost time series
 taus = seq(1,17)*12 # time in months, so seq is in years and multiply by 12 for months
 # set deltas
-deltas = seq(2,10, by = 0.5)
+deltas = seq(5,100, by = 5)
 
 # generate combination matrix and set column names
 parameters = expand.grid("tau" = taus, "delta" = deltas, KEEP.OUT.ATTRS = F) # should have length(deltas) x length(taus) rows; keep out attributes = F stops the return of metadata

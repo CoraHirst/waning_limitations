@@ -25,7 +25,7 @@ We will define 3 parameters: the magnitude of a primary boost in antibody titers
 
 ```{r static-parameters}
 # True power law parameters
-A1 = 10^5 # peak antibody titer at time = 1 month
+A1 = 10^3 # peak antibody titer at time = 1 month
 k = -0.5 #antibody decay constant
 
 #Tmax for simulations
