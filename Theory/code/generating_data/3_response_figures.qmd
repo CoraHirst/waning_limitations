@@ -197,8 +197,8 @@ I would like to show two different regimes - one where the error in the power la
 
 ```{r set-tau-delta}
 # tauu = 10 and delta = 3 vs tau = 5 and delta = 5
- tau = 5*12 #in months #in years
- delta = 10
+ tau = 10*12 #in months #in years
+ delta = 20
 
 # set scenario for parsing
  scenario = data.frame("tau" = tau, "delta" = delta) #restructure as df for use in join
@@ -217,19 +217,19 @@ I would like to show two different regimes - one where the error in the power la
   plot = ggplot() + 
     #plot populations
     geom_line(data = time.series.filtered %>% 
-                filter(response == "observed"), 
-              aes(x = time/12, y = log10(titer), linetype = "observed")) +
+                filter(response == "observed", time < tau), 
+              aes(x = time/12, y = log10(titer), linetype = "observed"), col = "blue", linewidth = 1) +
+    geom_line(data = time.series.filtered %>% 
+                filter(response == "response.2.titer"),
+                aes(x = time/12, y = log10(titer), linetype = "secondary response"), col = "red") +
      geom_line(data = time.series.filtered %>% 
                 filter(response == "observed",
-                       time > tau) , 
-              aes(x = time/12, y = log10(titer), linetype = "observed")) +
+                       time >= tau) , 
+              aes(x = time/12, y = log10(titer), linetype = "observed"), col = "black", linewidth = 1) +
      geom_line(data = time.series.filtered %>% 
                 filter(response == "response.1.titer") %>% 
                 filter(time > tau), 
-              aes(x = time/12, y = log10(titer), linetype = "primary response")) + 
-    geom_line(data = time.series.filtered %>% 
-                filter(response == "response.2.titer"),
-                aes(x = time/12, y = log10(titer), linetype = "secondary response")) +
+              aes(x = time/12, y = log10(titer), linetype = "primary response"), col = "blue") + 
     #labels 
     labs(x = "Years", y = "Log10 Titer", title = paste("Tau is", tau/12, "and delta is", delta), linetype = "") +
     #aesthetics
