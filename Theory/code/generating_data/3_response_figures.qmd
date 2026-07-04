@@ -198,7 +198,7 @@ I would like to show two different regimes - one where the error in the power la
 ```{r set-tau-delta}
 # tauu = 10 and delta = 3 vs tau = 5 and delta = 5
  tau = 10*12 #in months #in years
- delta = 20
+ delta = 10
 
 # set scenario for parsing
  scenario = data.frame("tau" = tau, "delta" = delta) #restructure as df for use in join
